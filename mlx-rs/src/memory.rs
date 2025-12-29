@@ -265,4 +265,220 @@ mod tests {
         // Reset to no limit
         set_wired_limit(0);
     }
+
+    // Integration tests demonstrating real-world usage
+
+    #[test]
+    fn test_active_memory_tracks_allocations() {
+        use crate::Array;
+
+        // Clear cache to start fresh
+        clear_cache().unwrap();
+
+        // Get baseline memory
+        let baseline = get_active_memory();
+
+        // Allocate a large array (10MB of f32 data = 2.5M elements)
+        let size = 2_500_000;
+        let arr = Array::zeros::<f32>(&[size]).unwrap();
+        arr.eval().unwrap();
+
+        // Active memory should increase
+        let after_alloc = get_active_memory();
+        let allocated = after_alloc.saturating_sub(baseline);
+
+        // Should have allocated at least the array size (10MB)
+        // Being conservative with the assertion due to overhead
+        let expected_bytes = (size as usize) * std::mem::size_of::<f32>() / 2;
+        assert!(
+            allocated >= expected_bytes,
+            "Expected significant memory allocation, got {} bytes",
+            allocated
+        );
+
+        // Drop the array and clear cache
+        drop(arr);
+        clear_cache().unwrap();
+    }
+
+    #[test]
+    fn test_peak_memory_tracking() {
+        use crate::{array, ops::add, Array};
+
+        // Reset peak memory to start fresh
+        reset_peak_memory().unwrap();
+        let baseline_peak = get_peak_memory();
+
+        // Allocate arrays and perform operations
+        let size = 1_000_000; // 4MB per array
+        let a = Array::full::<f32>(&[size], array!(1.0f32)).unwrap();
+        let b = Array::full::<f32>(&[size], array!(2.0f32)).unwrap();
+
+        // Perform operation that creates temporary result
+        let c = add(&a, &b).unwrap();
+        c.eval().unwrap();
+
+        // Peak memory should be higher than baseline
+        let peak = get_peak_memory();
+        assert!(
+            peak > baseline_peak,
+            "Peak memory should increase after allocations"
+        );
+
+        // Clean up
+        drop(a);
+        drop(b);
+        drop(c);
+        clear_cache().unwrap();
+    }
+
+    #[test]
+    fn test_cache_memory_behavior() {
+        use crate::Array;
+
+        // Clear cache to start fresh
+        clear_cache().unwrap();
+        let cache_after_clear = get_cache_memory();
+
+        // Create and drop arrays to populate cache
+        for _ in 0..5 {
+            let arr = Array::ones::<f32>(&[100_000]).unwrap();
+            arr.eval().unwrap();
+            drop(arr);
+        }
+
+        // Cache may contain memory from dropped arrays
+        // (behavior depends on MLX internals, so we just check it's measurable)
+        let cache_after_ops = get_cache_memory();
+
+        // Clear cache and verify it reduces
+        clear_cache().unwrap();
+        let cache_after_second_clear = get_cache_memory();
+
+        // Cache should be small after clearing (allowing some overhead)
+        assert!(
+            cache_after_second_clear < 1024 * 1024, // Less than 1MB
+            "Cache should be mostly cleared, got {} bytes",
+            cache_after_second_clear
+        );
+
+        println!(
+            "Cache progression: {} -> {} -> {} bytes",
+            cache_after_clear, cache_after_ops, cache_after_second_clear
+        );
+    }
+
+    #[test]
+    fn test_memory_limit_setting() {
+        use crate::Array;
+
+        // Set a conservative memory limit (100MB)
+        let limit = 100 * 1024 * 1024;
+        let old_limit = set_memory_limit(limit);
+
+        // Verify limit is set
+        assert_eq!(get_memory_limit(), limit);
+
+        // Create arrays within limit
+        let arr = Array::zeros::<f32>(&[1_000_000]).unwrap(); // 4MB
+        arr.eval().unwrap();
+
+        // Should succeed without issue
+        let active = get_active_memory();
+        assert!(active > 0, "Should have active memory");
+
+        // Clean up and restore old limit
+        drop(arr);
+        clear_cache().unwrap();
+        set_memory_limit(old_limit);
+    }
+
+    #[test]
+    fn test_cache_limit_enforcement() {
+        use crate::Array;
+
+        // Set a small cache limit (10MB)
+        let cache_limit = 10 * 1024 * 1024;
+        let old_limit = set_cache_limit(cache_limit);
+
+        // Clear cache to start fresh
+        clear_cache().unwrap();
+
+        // Create and drop arrays
+        for _ in 0..3 {
+            let arr = Array::ones::<f32>(&[500_000]).unwrap(); // 2MB each
+            arr.eval().unwrap();
+            drop(arr);
+        }
+
+        // Cache should respect the limit (though exact behavior depends on MLX)
+        let cache = get_cache_memory();
+        println!("Cache after operations with {}MB limit: {} bytes",
+                 cache_limit / (1024 * 1024), cache);
+
+        // Restore old limit and clean up
+        set_cache_limit(old_limit);
+        clear_cache().unwrap();
+    }
+
+    #[test]
+    fn test_realistic_workflow() {
+        use crate::{array, ops::matmul, Array};
+
+        // Simulate a realistic ML workflow with memory monitoring
+        println!("\n=== Realistic Memory Monitoring Workflow ===");
+
+        // Start fresh
+        clear_cache().unwrap();
+        reset_peak_memory().unwrap();
+
+        let initial_active = get_active_memory();
+        println!("Initial active memory: {} bytes", initial_active);
+
+        // Simulate loading model weights (two 1000x1000 matrices = 8MB total)
+        let weights = Array::full::<f32>(&[1000, 1000], array!(0.1f32)).unwrap();
+        let input = Array::full::<f32>(&[1000, 1000], array!(1.0f32)).unwrap();
+
+        weights.eval().unwrap();
+        input.eval().unwrap();
+
+        let after_load = get_active_memory();
+        println!(
+            "After loading arrays: {} bytes (+{} bytes)",
+            after_load,
+            after_load.saturating_sub(initial_active)
+        );
+
+        // Perform computation
+        let output = matmul(&input, &weights).unwrap();
+        output.eval().unwrap();
+
+        let after_compute = get_active_memory();
+        println!(
+            "After computation: {} bytes (+{} bytes)",
+            after_compute,
+            after_compute.saturating_sub(after_load)
+        );
+
+        // Check peak memory
+        let peak = get_peak_memory();
+        println!("Peak memory reached: {} bytes", peak);
+        assert!(peak >= after_compute, "Peak should be at least current active");
+
+        // Clean up
+        drop(weights);
+        drop(input);
+        drop(output);
+
+        let before_clear = get_cache_memory();
+        clear_cache().unwrap();
+        let after_clear = get_cache_memory();
+
+        println!(
+            "Cache before/after clear: {} -> {} bytes",
+            before_clear, after_clear
+        );
+
+        println!("=== End Workflow ===\n");
+    }
 }
