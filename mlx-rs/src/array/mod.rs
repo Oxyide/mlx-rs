@@ -1136,7 +1136,8 @@ mod tests {
                 let a2 = Arc::clone(&arr2);
 
                 thread::spawn(move || {
-                    let sum = (&*a1 + &*a2).eval().unwrap();
+                    let sum = &*a1 + &*a2;
+                    sum.eval().unwrap();
                     sum.as_slice::<f32>().to_vec()
                 })
             })
