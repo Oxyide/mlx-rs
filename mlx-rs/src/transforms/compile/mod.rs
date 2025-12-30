@@ -150,6 +150,21 @@ use parking_lot::Mutex;
 use super::{Closure, Guarded, VectorArray};
 use crate::Array;
 
+/// Global lock for compilation operations.
+///
+/// # Thread Safety
+///
+/// MLX's C++ compilation system is not thread-safe for concurrent compile() calls.
+/// Multiple threads calling mlx_detail_compile() simultaneously can corrupt the
+/// compilation cache and cause segmentation faults, even when compiling different
+/// functions with different IDs.
+///
+/// This lock serializes all compilation operations to prevent data corruption.
+///
+/// Performance note: Concurrent compile() calls will be serialized, which may impact
+/// parallel workloads. This is a necessary trade-off for safety.
+pub(crate) static COMPILE_LOCK: Mutex<()> = parking_lot::const_mutex(());
+
 #[allow(clippy::module_inception)]
 mod compile;
 mod compile_with_state;

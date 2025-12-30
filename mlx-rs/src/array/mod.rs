@@ -73,6 +73,14 @@ impl Drop for Array {
 
 unsafe impl Send for Array {}
 
+/// # Safety
+///
+/// Array can be safely shared between threads because:
+/// 1. All mutation operations are protected by locks (EVAL_LOCK, COMPILE_LOCK)
+/// 2. The underlying MLX C++ layer manages its own memory
+/// 3. Array operations are serialized through global locks to prevent data races
+unsafe impl Sync for Array {}
+
 impl PartialEq for Array {
     /// Array equality check.
     ///

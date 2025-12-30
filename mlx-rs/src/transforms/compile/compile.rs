@@ -347,6 +347,10 @@ fn call_mut_inner(
 ) -> crate::error::Result<Vec<Array>> {
     // note: this will use the cached compile (via the id)
     // but will be able to re-evaluate with fresh state if needed
+
+    // Acquire global compilation lock to prevent concurrent compilation corruption
+    let _compile_guard = super::COMPILE_LOCK.lock();
+
     let compiled = Closure::try_from_op(|res| unsafe {
         let constants = &[];
         mlx_sys::mlx_detail_compile(
