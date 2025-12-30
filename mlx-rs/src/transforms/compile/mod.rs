@@ -144,6 +144,8 @@
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use std::sync::Arc;
+use parking_lot::Mutex;
 
 use super::{Closure, Guarded, VectorArray};
 use crate::Array;
@@ -181,10 +183,27 @@ pub fn clear_cache() {
 }
 
 /// A compiled function that can be called.
+///
+/// # Thread Safety
+///
+/// Concurrent calls to the same compiled function are serialized using a per-instance
+/// lock to prevent corruption of MLX's compile cache.
+///
+/// See:
+/// - Issue #258, #224: https://github.com/oxideai/mlx-rs/issues/258
+/// - mlx-swift solution: https://github.com/ml-explore/mlx-swift/pull/226
 #[derive(Debug, Clone)]
 pub struct Compiled<F, G> {
     f_marker: std::marker::PhantomData<F>,
     state: CompiledState<G>,
+    /// Lock to protect concurrent calls to the same compiled function.
+    ///
+    /// MLX's compile cache is not thread-safe. Multiple threads calling the
+    /// same compiled function simultaneously can corrupt the cache and cause
+    /// segmentation faults.
+    ///
+    /// Using Arc<Mutex<()>> allows Clone while still protecting the function.
+    lock: Arc<Mutex<()>>,
 }
 
 #[derive(Debug, Clone)]

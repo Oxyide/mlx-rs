@@ -298,7 +298,16 @@ impl Array {
     }
 
     /// Evaluate the array.
+    ///
+    /// # Thread Safety
+    ///
+    /// This method is safe to call from multiple threads. Concurrent eval() calls
+    /// are serialized using a global lock to prevent corruption of MLX's internal state.
+    ///
+    /// Performance note: Concurrent eval() calls will be serialized, which may impact
+    /// parallel workloads. This is a necessary trade-off for safety.
     pub fn eval(&self) -> crate::error::Result<()> {
+        let _guard = crate::transforms::EVAL_LOCK.lock();
         <() as Guarded>::try_from_op(|_| unsafe { mlx_sys::mlx_array_eval(self.as_ptr()) })
     }
 
