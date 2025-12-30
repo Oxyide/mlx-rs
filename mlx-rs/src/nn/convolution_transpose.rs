@@ -43,6 +43,10 @@ pub struct ConvTranspose1dBuilder {
     /// Stride. Default to [`ConvTranspose1d::DEFAULT_STRIDE`] if not specified.
     #[builder(optional, default = ConvTranspose1d::DEFAULT_STRIDE)]
     pub stride: i32,
+
+    /// Dilation. Default to [`ConvTranspose1d::DEFAULT_DILATION`] if not specified.
+    #[builder(optional, default = ConvTranspose1d::DEFAULT_DILATION)]
+    pub dilation: i32,
 }
 
 fn build_conv_transpose_1d(builder: ConvTranspose1dBuilder) -> Result<ConvTranspose1d, Exception> {
@@ -54,6 +58,7 @@ fn build_conv_transpose_1d(builder: ConvTranspose1dBuilder) -> Result<ConvTransp
     let padding = builder.padding;
     let output_padding = builder.output_padding;
     let stride = builder.stride;
+    let dilation = builder.dilation;
 
     let scale = f32::sqrt(1.0f32 / (input_channels * kernel_size) as f32);
     let weight = uniform::<_, f32>(
@@ -74,6 +79,7 @@ fn build_conv_transpose_1d(builder: ConvTranspose1dBuilder) -> Result<ConvTransp
         padding,
         output_padding,
         stride,
+        dilation,
     })
 }
 
@@ -104,6 +110,9 @@ pub struct ConvTranspose1d {
 
     /// Stride. Default to 1 if not specified.
     pub stride: i32,
+
+    /// Dilation. Default to 1 if not specified.
+    pub dilation: i32,
 }
 
 impl ConvTranspose1d {
@@ -118,6 +127,9 @@ impl ConvTranspose1d {
 
     /// Default value for `stride` if not specified.
     pub const DEFAULT_STRIDE: i32 = 1;
+
+    /// Default value for `dilation` if not specified.
+    pub const DEFAULT_DILATION: i32 = 1;
 }
 
 impl Module<&Array> for ConvTranspose1d {
@@ -130,7 +142,7 @@ impl Module<&Array> for ConvTranspose1d {
             self.weight.as_ref(),
             self.stride,
             self.padding,
-            None,
+            self.dilation,
             self.output_padding,
             None,
         )?;
@@ -176,6 +188,10 @@ pub struct ConvTranspose2dBuilder {
     /// Stride. Default to [`ConvTranspose2d::DEFAULT_STRIDE`] if not specified.
     #[builder(optional, default = ConvTranspose2d::DEFAULT_STRIDE)]
     stride: SingleOrPair<i32>,
+
+    /// Dilation. Default to [`ConvTranspose2d::DEFAULT_DILATION`] if not specified.
+    #[builder(optional, default = ConvTranspose2d::DEFAULT_DILATION)]
+    dilation: SingleOrPair<i32>,
 }
 
 fn build_conv_transpose_2d(builder: ConvTranspose2dBuilder) -> Result<ConvTranspose2d, Exception> {
@@ -187,6 +203,7 @@ fn build_conv_transpose_2d(builder: ConvTranspose2dBuilder) -> Result<ConvTransp
     let padding = builder.padding.into();
     let output_padding = builder.output_padding.into();
     let stride = builder.stride.into();
+    let dilation = builder.dilation.into();
 
     let scale = f32::sqrt(1.0 / (input_channels * kernel_size.0 * kernel_size.1) as f32);
     let weight = uniform::<_, f32>(
@@ -212,6 +229,7 @@ fn build_conv_transpose_2d(builder: ConvTranspose2dBuilder) -> Result<ConvTransp
         padding,
         output_padding,
         stride,
+        dilation,
     })
 }
 
@@ -243,6 +261,9 @@ pub struct ConvTranspose2d {
 
     /// Stride. Default to `(1, 1)` if not specified.
     pub stride: (i32, i32),
+
+    /// Dilation. Default to `(1, 1)` if not specified.
+    pub dilation: (i32, i32),
 }
 
 impl ConvTranspose2d {
@@ -257,6 +278,9 @@ impl ConvTranspose2d {
 
     /// Default value for `stride` if not specified.
     pub const DEFAULT_STRIDE: SingleOrPair<i32> = SingleOrPair::Pair(1, 1);
+
+    /// Default value for `dilation` if not specified.
+    pub const DEFAULT_DILATION: SingleOrPair<i32> = SingleOrPair::Pair(1, 1);
 }
 
 impl Module<&Array> for ConvTranspose2d {
@@ -269,7 +293,7 @@ impl Module<&Array> for ConvTranspose2d {
             self.weight.as_ref(),
             self.stride,
             self.padding,
-            None,
+            self.dilation,
             self.output_padding,
             None,
         )?;
@@ -315,6 +339,10 @@ pub struct ConvTranspose3dBuilder {
     /// Stride. Default to [`ConvTranspose3d::DEFAULT_STRIDE`] if not specified.
     #[builder(optional, default = ConvTranspose3d::DEFAULT_STRIDE)]
     pub stride: SingleOrTriple<i32>,
+
+    /// Dilation. Default to [`ConvTranspose3d::DEFAULT_DILATION`] if not specified.
+    #[builder(optional, default = ConvTranspose3d::DEFAULT_DILATION)]
+    pub dilation: SingleOrTriple<i32>,
 }
 
 fn build_conv_transpose_3d(builder: ConvTranspose3dBuilder) -> Result<ConvTranspose3d, Exception> {
@@ -326,6 +354,7 @@ fn build_conv_transpose_3d(builder: ConvTranspose3dBuilder) -> Result<ConvTransp
     let padding = builder.padding.into();
     let output_padding = builder.output_padding.into();
     let stride = builder.stride.into();
+    let dilation = builder.dilation.into();
 
     let scale =
         f32::sqrt(1.0 / (input_channels * kernel_size.0 * kernel_size.1 * kernel_size.2) as f32);
@@ -353,6 +382,7 @@ fn build_conv_transpose_3d(builder: ConvTranspose3dBuilder) -> Result<ConvTransp
         padding,
         output_padding,
         stride,
+        dilation,
     })
 }
 
@@ -384,6 +414,9 @@ pub struct ConvTranspose3d {
 
     /// Stride. Default to `(1, 1, 1)` if not specified.
     pub stride: (i32, i32, i32),
+
+    /// Dilation. Default to `(1, 1, 1)` if not specified.
+    pub dilation: (i32, i32, i32),
 }
 
 impl ConvTranspose3d {
@@ -398,6 +431,9 @@ impl ConvTranspose3d {
 
     /// Default value for `stride` if not specified.
     pub const DEFAULT_STRIDE: SingleOrTriple<i32> = SingleOrTriple::Triple(1, 1, 1);
+
+    /// Default value for `dilation` if not specified.
+    pub const DEFAULT_DILATION: SingleOrTriple<i32> = SingleOrTriple::Triple(1, 1, 1);
 }
 
 impl Module<&Array> for ConvTranspose3d {
@@ -410,7 +446,7 @@ impl Module<&Array> for ConvTranspose3d {
             self.weight.as_ref(),
             self.stride,
             self.padding,
-            None,
+            self.dilation,
             self.output_padding,
             None,
         )?;

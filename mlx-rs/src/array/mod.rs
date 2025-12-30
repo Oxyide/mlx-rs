@@ -1130,13 +1130,14 @@ mod tests {
         let arr1 = Arc::new(Array::from_slice(&[1.0f32, 2.0, 3.0], &[3]));
         let arr2 = Arc::new(Array::from_slice(&[4.0f32, 5.0, 6.0], &[3]));
 
-        let handles: Vec<_> = (0..10)
+        let handles: Vec<thread::JoinHandle<Vec<f32>>> = (0..10)
             .map(|_| {
                 let a1 = Arc::clone(&arr1);
                 let a2 = Arc::clone(&arr2);
 
                 thread::spawn(move || {
-                    let sum = (&*a1 + &*a2).eval().unwrap();
+                    let sum = &*a1 + &*a2;
+                    sum.eval().unwrap();
                     sum.as_slice::<f32>().to_vec()
                 })
             })
