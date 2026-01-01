@@ -16,7 +16,13 @@
 //!
 //! The functions that contains `device` in their name are meant to be used with a user-specified
 //! `StreamOrDevice`. If you don't care about the stream, you can use the functions without `device`
-//! in their names. Please note that GPU device support is not yet implemented.
+//! in their names.
+//!
+//! # GPU Support
+//!
+//! GPU (Metal) support for FFT operations was added in MLX v0.15.0 (March 2024) and supports
+//! power-of-2 sizes up to 2048. FFT operations will automatically use GPU execution when a GPU
+//! stream is provided.
 //!
 //! # Examples
 //!
