@@ -46,6 +46,7 @@
 //! ```
 
 use mlx_sys::mlx_closure_value_and_grad;
+use parking_lot::Mutex;
 
 use crate::{
     error::{get_and_clear_closure_error, Result},
@@ -63,8 +64,32 @@ pub use grad::*;
 pub use keyed_value_and_grad::*;
 pub use value_and_grad::*;
 
+/// Global lock for eval operations.
+///
+/// # Thread Safety
+///
+/// MLX's C++ core is not thread-safe for concurrent eval() calls. Multiple threads
+/// calling eval() simultaneously can corrupt the lazy evaluation graph and cause
+/// segmentation faults.
+///
+/// This lock serializes all evaluation operations to prevent data corruption.
+///
+/// See:
+/// - Issue #259: https://github.com/oxideai/mlx-rs/issues/259
+/// - mlx-swift solution: https://github.com/ml-explore/mlx-swift/blob/main/Source/MLX/Transforms%2BEval.swift#L9
+pub(crate) static EVAL_LOCK: Mutex<()> = parking_lot::const_mutex(());
+
 /// Evaluate an iterator of [`Array`]s.
+///
+/// # Thread Safety
+///
+/// This function is safe to call from multiple threads. Concurrent eval() calls
+/// are serialized using a global lock to prevent corruption of MLX's internal state.
+///
+/// Performance note: Concurrent eval() calls will be serialized, which may impact
+/// parallel workloads. This is a necessary trade-off for safety.
 pub fn eval<'a>(outputs: impl IntoIterator<Item = &'a Array>) -> Result<()> {
+    let _guard = EVAL_LOCK.lock();
     let vec = VectorArray::try_from_iter(outputs.into_iter())?;
     <() as Guarded>::try_from_op(|_| unsafe { mlx_sys::mlx_eval(vec.as_ptr()) })
 }
@@ -79,7 +104,13 @@ pub fn eval_params(params: ModuleParamRef<'_>) -> Result<()> {
 /// Asynchronously evaluate an iterator of [`Array`]s.
 ///
 /// Please note that this is not a rust async function.
+///
+/// # Thread Safety
+///
+/// This function is safe to call from multiple threads. Concurrent async_eval() calls
+/// are serialized using a global lock to prevent corruption of MLX's internal state.
 pub fn async_eval<'a>(outputs: impl IntoIterator<Item = &'a Array>) -> Result<()> {
+    let _guard = EVAL_LOCK.lock();
     let vec = VectorArray::try_from_iter(outputs.into_iter())?;
     <() as Guarded>::try_from_op(|_| unsafe { mlx_sys::mlx_async_eval(vec.as_ptr()) })
 }

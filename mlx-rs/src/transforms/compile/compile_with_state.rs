@@ -6,7 +6,8 @@
 
 // TODO: there's plenty boilerplate code here but it's not clear how to reduce it
 
-use std::{cell::RefCell, marker::PhantomData, rc::Rc};
+use std::{cell::RefCell, marker::PhantomData, rc::Rc, sync::Arc};
+use parking_lot::Mutex;
 
 use crate::{
     error::Exception,
@@ -77,6 +78,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -101,6 +103,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -125,6 +128,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -149,6 +153,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -173,6 +178,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -197,6 +203,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -221,6 +228,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -245,6 +253,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -262,6 +271,7 @@ where
     U: Updatable,
 {
     fn call_mut(&mut self, state: &mut U, args: &[Array]) -> Result<Vec<Array>, Exception> {
+        let _guard = self.lock.lock();
         self.state.retry_call_mut_with_state(state, args)
     }
 }
@@ -273,6 +283,7 @@ where
     U: Updatable,
 {
     fn call_mut(&mut self, state: &mut U, args: &Array) -> Result<Array, Exception> {
+        let _guard = self.lock.lock();
         let args = std::slice::from_ref(args);
         let result = self.state.retry_call_mut_with_state(state, args)?;
         Ok(result.into_iter().next().unwrap())
@@ -286,6 +297,7 @@ where
     U: Updatable,
 {
     fn call_mut(&mut self, state: &mut U, args: (&Array, &Array)) -> Result<Array, Exception> {
+        let _guard = self.lock.lock();
         let args = &[args.0, args.1];
         let result = self.state.retry_call_mut_with_state(state, args)?;
         Ok(result.into_iter().next().unwrap())
@@ -303,6 +315,7 @@ where
         state: &mut U,
         args: (&Array, &Array, &Array),
     ) -> Result<Array, Exception> {
+        let _guard = self.lock.lock();
         let args = &[args.0, args.1, args.2];
         let result = self.state.retry_call_mut_with_state(state, args)?;
         Ok(result.into_iter().next().unwrap())
@@ -316,6 +329,7 @@ where
     U: Updatable,
 {
     fn call_mut(&mut self, state: &mut U, args: &[Array]) -> Result<Vec<Array>, Exception> {
+        let _guard = self.lock.lock();
         self.state.retry_fallible_call_mut_with_state(state, args)
     }
 }
@@ -327,6 +341,7 @@ where
     U: Updatable,
 {
     fn call_mut(&mut self, state: &mut U, args: &Array) -> Result<Array, Exception> {
+        let _guard = self.lock.lock();
         let args = std::slice::from_ref(args);
         let result = self.state.retry_fallible_call_mut_with_state(state, args)?;
         Ok(result.into_iter().next().unwrap())
@@ -340,6 +355,7 @@ where
     U: Updatable,
 {
     fn call_mut(&mut self, state: &mut U, args: (&Array, &Array)) -> Result<Array, Exception> {
+        let _guard = self.lock.lock();
         let args = &[args.0, args.1];
         let result = self.state.retry_fallible_call_mut_with_state(state, args)?;
         Ok(result.into_iter().next().unwrap())
@@ -357,6 +373,7 @@ where
         state: &mut U,
         args: (&Array, &Array, &Array),
     ) -> Result<Array, Exception> {
+        let _guard = self.lock.lock();
         let args = &[args.0, args.1, args.2];
         let result = self.state.retry_fallible_call_mut_with_state(state, args)?;
         Ok(result.into_iter().next().unwrap())
@@ -376,6 +393,10 @@ where
 {
     // note: this will use the cached compile (via the id)
     // but will be able to re-evaluate with fresh state if needed
+
+    // Acquire global compilation lock to prevent concurrent compilation corruption
+    let _compile_guard = super::COMPILE_LOCK.lock();
+
     let compiled = Closure::try_from_op(|res| unsafe {
         let constants = &[];
         mlx_sys::mlx_detail_compile(

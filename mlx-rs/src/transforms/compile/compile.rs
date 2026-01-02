@@ -3,6 +3,8 @@
 // TODO: there's plenty boilerplate code here but it's not clear how to reduce it
 
 use std::marker::PhantomData;
+use std::sync::Arc;
+use parking_lot::Mutex;
 
 use crate::{error::Exception, Array};
 
@@ -65,6 +67,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -85,6 +88,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -105,6 +109,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -125,6 +130,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -148,6 +154,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -171,6 +178,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -194,6 +202,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -217,6 +226,7 @@ where
         Compiled {
             f_marker: PhantomData::<F>,
             state,
+            lock: Arc::new(Mutex::new(())),
         }
     }
 }
@@ -233,6 +243,7 @@ where
     G: FnMut(&[Array]) -> Vec<Array> + 'a,
 {
     fn call_mut(&mut self, args: &[Array]) -> Result<Vec<Array>, Exception> {
+        let _guard = self.lock.lock();
         self.state.call_mut(args)
     }
 }
@@ -243,6 +254,7 @@ where
     G: FnMut(&[Array]) -> Vec<Array> + 'a,
 {
     fn call_mut(&mut self, args: &Array) -> Result<Array, Exception> {
+        let _guard = self.lock.lock();
         let args = std::slice::from_ref(args);
         let result = self.state.call_mut(args)?;
         Ok(result.into_iter().next().unwrap())
@@ -255,6 +267,7 @@ where
     G: FnMut(&[Array]) -> Vec<Array> + 'a,
 {
     fn call_mut(&mut self, args: (&Array, &Array)) -> Result<Array, Exception> {
+        let _guard = self.lock.lock();
         let args = &[args.0, args.1];
         let result = self.state.call_mut(args)?;
         Ok(result.into_iter().next().unwrap())
@@ -267,6 +280,7 @@ where
     G: FnMut(&[Array]) -> Vec<Array> + 'a,
 {
     fn call_mut(&mut self, args: (&Array, &Array, &Array)) -> Result<Array, Exception> {
+        let _guard = self.lock.lock();
         // Is there any way to avoid this shallow clone?
         let args = &[args.0, args.1, args.2];
         let result = self.state.call_mut(args)?;
@@ -280,6 +294,7 @@ where
     G: FnMut(&[Array]) -> Result<Vec<Array>, Exception> + 'a,
 {
     fn call_mut(&mut self, args: &[Array]) -> Result<Vec<Array>, Exception> {
+        let _guard = self.lock.lock();
         self.state.fallible_call_mut(args)
     }
 }
@@ -290,6 +305,7 @@ where
     G: FnMut(&[Array]) -> Result<Vec<Array>, Exception> + 'a,
 {
     fn call_mut(&mut self, args: &Array) -> Result<Array, Exception> {
+        let _guard = self.lock.lock();
         let args = &[args];
         let result = self.state.fallible_call_mut(args)?;
         Ok(result.into_iter().next().unwrap())
@@ -302,6 +318,7 @@ where
     G: FnMut(&[Array]) -> Result<Vec<Array>, Exception> + 'a,
 {
     fn call_mut(&mut self, args: (&Array, &Array)) -> Result<Array, Exception> {
+        let _guard = self.lock.lock();
         let args = &[args.0, args.1];
         let result = self.state.fallible_call_mut(args)?;
         Ok(result.into_iter().next().unwrap())
@@ -314,6 +331,7 @@ where
     G: FnMut(&[Array]) -> Result<Vec<Array>, Exception> + 'a,
 {
     fn call_mut(&mut self, args: (&Array, &Array, &Array)) -> Result<Array, Exception> {
+        let _guard = self.lock.lock();
         let args = &[args.0, args.1, args.2];
         let result = self.state.fallible_call_mut(args)?;
         Ok(result.into_iter().next().unwrap())
@@ -329,6 +347,10 @@ fn call_mut_inner(
 ) -> crate::error::Result<Vec<Array>> {
     // note: this will use the cached compile (via the id)
     // but will be able to re-evaluate with fresh state if needed
+
+    // Acquire global compilation lock to prevent concurrent compilation corruption
+    let _compile_guard = super::COMPILE_LOCK.lock();
+
     let compiled = Closure::try_from_op(|res| unsafe {
         let constants = &[];
         mlx_sys::mlx_detail_compile(

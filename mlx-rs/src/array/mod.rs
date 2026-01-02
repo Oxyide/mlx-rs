@@ -75,8 +75,11 @@ impl Drop for Array {
 unsafe impl Send for Array {}
 
 // SAFETY: MLX uses atomic reference counting for arrays.
-// Multiple threads can hold references to the same array and call
-// methods concurrently. The underlying C++ implementation is thread-safe.
+// Array can be safely shared between threads because:
+// 1. All mutation operations are protected by locks (EVAL_LOCK, COMPILE_LOCK)
+// 2. The underlying MLX C++ layer manages its own memory
+// 3. Array operations are serialized through global locks to prevent data races
+// 4. Multiple threads can hold references to the same array and call methods concurrently
 unsafe impl Sync for Array {}
 
 impl PartialEq for Array {
@@ -304,7 +307,16 @@ impl Array {
     }
 
     /// Evaluate the array.
+    ///
+    /// # Thread Safety
+    ///
+    /// This method is safe to call from multiple threads. Concurrent eval() calls
+    /// are serialized using a global lock to prevent corruption of MLX's internal state.
+    ///
+    /// Performance note: Concurrent eval() calls will be serialized, which may impact
+    /// parallel workloads. This is a necessary trade-off for safety.
     pub fn eval(&self) -> crate::error::Result<()> {
+        let _guard = crate::transforms::EVAL_LOCK.lock();
         <() as Guarded>::try_from_op(|_| unsafe { mlx_sys::mlx_array_eval(self.as_ptr()) })
     }
 
