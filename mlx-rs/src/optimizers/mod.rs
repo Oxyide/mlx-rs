@@ -26,6 +26,7 @@ mod adamw;
 mod lion;
 mod rmsprop;
 mod sgd;
+pub mod schedulers;
 
 pub use adadelta::*;
 pub use adafactor::*;
