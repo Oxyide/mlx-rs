@@ -35,6 +35,8 @@ _[Blaze](https://runblaze.dev) supports this project by providing ultra-fast App
 
 Due to known limitation of docsrs, we are hosting the documentation on github pages [here](https://oxideai.github.io/mlx-rs/mlx_rs/).
 
+**Converting from Python MLX**: See the [Python to Rust Mapping Guide](../docs/PYTHON_TO_RUST.md) for a comprehensive guide on translating Python MLX code to Rust.
+
 ## Features
 
 MLX is an array framework for machine learning on Apple Silicon. mlx-rs provides Rust bindings for MLX, allowing you to use MLX in your Rust projects.
